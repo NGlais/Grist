@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<!--
+    @file index.html
+    @description Page principale de l'Organigramme SAAM.
+    Affiche une vue graphique hiérarchique avec recherche rapide et export PDF.
+    
+    Structure Grist attendue :
+    - Table "Agents" (Nom, Prénom, Fonction, Structure_Réf, etc.)
+    - Table "Structures" (Libellé, Code, Responsable, Position_Grit)
+    - Table "Config_Logo" (Masquage ou personnalisation du logo institutionnel)
+-->
+<html lang="fr" data-fr-scheme="system">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organigramme Mairie - Vue Détaillée</title>
+
+    <!-- DSFR -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/dsfr/dsfr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/utility/icons/icons.min.css">
+
+    <!-- Style Personnalisé -->
+    <style>/* =============================================================================
+   @file style.css
+   @description Charte graphique et mise en page de l'Organigramme SAAM.
+   Surcharges du Système de Design de l'État (DSFR) et composants spécifiques.
+   
+   SOMMAIRE :
+   1. LAYOUT & STRUCTURE (Grilles)
+   2. COMPOSANTS : TUILES (Organigramme)
+   3. COMPOSANTS : MODALE DE DÉTAIL
+   4. COMPOSANTS : CARTES AGENTS (Accordéons)
+   5. ÉLÉMENTS UI & ANIMATIONS
+   6. EXPORT PDF & IMPRESSION
+   ============================================================================= */
+
+/* 1. LAYOUT & STRUCTURE (Grilles)
+   ========================================================================== */
+
+/* Conteneur principal limité en largeur */
+.fr-container {
+    max-width: 1400px;
+}
+
+/* --- ZONE SUPÉRIEURE (Top Stack) --- 
+   Structure asymétrique : Gauche (Stack), Centre (Unique), Droite (Stack) */
+.top-zone {
+    display: grid;
+    grid-template-columns: 250px 1fr 200px;
+    gap: 2rem;
+    margin-bottom: 3rem;
+    align-items: start;
+}
+
+.top-stack-left,
+.top-stack-right {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* --- GRILLE PRINCIPALE (4 COLONNES) --- 
+   Utilisée pour les sous-directions et bureaux */
+.main-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.column-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Bulle info presse-papier (Tooltip) */
+.copy-tooltip {
+    position: absolute;
+    background: var(--background-action-high-success);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-transform: none;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: opacity 0.2s;
+    /* animation de fondu entrante basique */
+    animation: fadeInTooltip 0.2s forwards;
+}
+
+@keyframes fadeInTooltip {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 2. COMPOSANTS : TUILES (Organigramme)
+   ========================================================================== */
+
+.fr-tile {
+    width: 100%;
+    background-color: var(--background-default-grey);
+    border: 1px solid var(--border-default-grey) !important;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
+    /* Ombre légère */
+    border-radius: 8px;
+    margin: 0;
+    padding: 0 !important;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 180px;
+    /* Hauteur fixe pour uniformité */
+    transition: transform 0.4s ease-out;
+    animation: fadeIn 0.4s ease-out;
+
+    /* Règles pour l'export PDF (éviter les coupures de cases) */
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+/* 6. EXPORT PDF & IMPRESSION
+   ========================================================================== */
+
+/* Forçage des couleurs institutionnelles pour l'impression */
+@media print {
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .fr-tile {
+        background-color: #f6f6f6 !important;
+        /* var(--background-default-grey) forcé */
+        border: 1px solid #e5e5e5 !important;
+    }
+
+    .tile-header {
+        background-color: #000091 !important;
+        /* var(--background-contrast-blue-france) */
+        color: #ffffff !important;
+    }
+
+    .fr-tile__title {
+        color: #000091 !important;
+    }
+
+    .tile-resp-name {
+        color: #666666 !important;
+    }
+
+    .tile-chef {
+        border-color: #000091 !important;
+        background-color: #e3e3fd !important;
+        /* fond bleuté */
+    }
+
+    .tile-chef .tile-header {
+        background-color: #000091 !important;
+    }
+
+    /* Gérer le texte blanc sur fond bleu dans le DSFR qui peut passer en noir à l'impression */
+    .fr-badge--info {
+        background-color: #e8edff !important;
+        color: #0063cb !important;
+    }
+}
+
+/* 1. EN-TÊTE (CODE BUREAU) */
+.tile-header {
+    background-color: var(--background-contrast-blue-france);
+    color: var(--text-label-blue-france);
+    padding: 0.4rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border-default-grey);
+    text-align: left;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 2. CORPS DE LA CARTE */
+.fr-tile__body {
+    padding: 1rem !important;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start !important;
+    /* Alignement haut-gauche par défaut */
+    align-items: flex-start !important;
+    text-align: left !important;
+}
+
+/* 3. TITRE DU SERVICE */
+.fr-tile__title {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--blue-france-sun-113-625);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    /* Limite à 4 lignes */
+    -webkit-box-orient: vertical;
+}
+
+.fr-tile__title a {
+    background-image: none !important;
+    color: inherit;
+}
+
+/* 4. LE RESPONSABLE (En bas de carte) */
+.tile-resp-container {
+    width: 100%;
+    margin-top: auto !important;
+    /* Pousse vers le bas */
+}
+
+.tile-separator {
+    width: 100%;
+    height: 1px;
+    background-color: var(--blue-france-main-525);
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+.tile-resp-name {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-mention-grey);
+    font-weight: 600;
+    text-transform: uppercase;
+    word-wrap: break-word;
+}
+
+/* --- STYLE SPÉCIFIQUE : LE CHEF (Position Centrale) --- */
+.tile-chef {
+    border: 2px solid var(--blue-france-main-525) !important;
+    background-color: var(--background-contrast-info);
+    /* Fond bleuté */
+    height: auto;
+    min-height: 180px;
+}
+
+.tile-chef .tile-header {
+    background-color: var(--blue-france-main-525);
+    color: white;
+}
+
+/* Centrage total pour le chef */
+.tile-chef .fr-tile__body {
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+
+.tile-chef .tile-resp-container {
+    margin-top: 1rem !important;
+    /* Pas de push-down auto */
+}
+
+.tile-chef .tile-separator {
+    display: none;
+}
+
+/* --- STYLE SPÉCIFIQUE : TUILE POINTILLÉE --- */
+.tile-dashed {
+    border: 2px dashed var(--blue-france-main-525) !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.tile-dashed:hover {
+    background-color: var(--background-alt-grey-hover) !important;
+    border-style: solid !important;
+    /* Bordure pleine au survol */
+}
+
+/* --- STYLE SPÉCIFIQUE : TÊTE DE COLONNE (V1) --- */
+.tile-head {
+    border-top: 6px solid var(--blue-france-main-525) !important;
+    border-bottom: 1px solid var(--border-default-grey) !important;
+    height: 230px !important;
+    /* Plus haute */
+    margin-bottom: 1.5rem;
+}
+
+.tile-head .fr-tile__title {
+    font-size: 0.85rem;
+    line-height: 1.3;
+    text-transform: uppercase;
+    color: var(--blue-france-main-525);
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+}
+
+/* 3. COMPOSANTS : MODALE DE DÉTAIL (PLEIN ÉCRAN)
+   ========================================================================== */
+
+/* Conteneur principal (Dialog) */
+dialog[open] {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    animation: backdrop-appear 0.4s ease-out forwards;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+    overflow: hidden !important;
+    /* Empêche le scroll du body */
+}
+
+/* Centrage Flex */
+dialog .fr-container {
+    height: 100%;
+    width: 100%;
+    padding: 0 !important;
+    pointer-events: none;
+    /* Laisse passer les clics au backdrop si besoin */
+    display: flex;
+    flex-direction: column;
+    justify-content: center !important;
+}
+
+dialog .fr-grid-row {
+    width: 100%;
+    display: flex;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 0 !important;
+}
+
+dialog .fr-col-12 {
+    pointer-events: auto;
+    /* Réactive les clics sur la modale */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0 !important;
+    margin: auto !important;
+    max-height: 100%;
+}
+
+/* Fond sombre (Backdrop) */
+dialog::backdrop {
+    background-color: rgba(0, 0, 0, 0.6);
+    animation: backdrop-appear 0.5s ease-out forwards;
+}
+
+@keyframes backdrop-appear {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Corps de la modale */
+.fr-modal__body {
+    background-color: var(--background-default-grey) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 90vh !important;
+    /* Max 90% de hauteur d'écran */
+    min-height: auto !important;
+    margin: 0 auto !important;
+}
+
+dialog[open] .fr-modal__body {
+    animation: modal-fade 0.3s ease-out forwards;
+}
+
+@keyframes modal-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Header (Bouton Fermer) */
+.fr-modal__header {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem !important;
+    display: flex;
+    justify-content: flex-end;
+    position: relative !important;
+    background-color: var(--background-default-grey);
+    z-index: 10;
+    border-bottom: none;
+}
+
+/* Contenu Scrollable */
+.fr-modal__content {
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    /* Scroll interne */
+    padding: 0 2rem 2rem 2rem !important;
+}
+
+.fr-modal__title {
+    margin-top: 0 !important;
+    margin-bottom: 2rem !important;
+    color: var(--blue-france-sun-113-625);
+}
+
+/* 4. COMPOSANTS : CARTES AGENTS (ACCORDÉONS)
+   ========================================================================== */
+
+/* Conteneur de l'accordéon agent */
+.agent-accordion {
+    border: 1px solid var(--border-default-grey);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background-color: var(--background-default-grey);
+    overflow: hidden;
+}
+
+/* En-tête cliquable */
+.agent-header {
+    padding: 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--background-default-grey);
+    transition: background 0.2s;
+}
+
+.agent-header:hover {
+    background-color: var(--background-alt-grey-hover);
+}
+
+/* Flèche d'ouverture */
+.agent-arrow {
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.2rem;
+    color: var(--blue-france-main-525);
+}
+
+.agent-accordion.open .agent-arrow {
+    transform: rotate(180deg);
+}
+
+/* Contenu caché (Détails) */
+.agent-details {
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 1.5rem;
+    opacity: 0;
+    transition: max-height 0.3s cubic-bezier(0, 0, 0.2, 1),
+        padding 0.3s cubic-bezier(0, 0, 0.2, 1),
+        opacity 0.3s ease-out;
+    background-color: var(--background-contrast-grey);
+    border-top: 1px solid var(--border-default-grey);
+}
+
+.agent-accordion.open .agent-details {
+    max-height: 5000px;
+    /* Valeur haute pour éviter la coupure du contenu */
+    padding: 1.5rem;
+    opacity: 1;
+}
+
+/* Grille des détails */
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.detail-item {
+    margin-bottom: 0.5rem;
+}
+
+.detail-label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-default-grey);
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 0.95rem;
+    color: var(--text-default-grey);
+    font-weight: 500;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+.detail-value a {
+    color: var(--blue-france-main-525);
+}
+
+/* Badge (Optionnel) */
+.badge-chef {
+    background-color: var(--blue-france-main-525);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    text-transform: uppercase;
+    vertical-align: middle;
+}</style>
+</head>
+
+<body>
+
+    <!-- EN-TÊTE -->
+    <header role="banner" class="fr-header">
+        <div class="fr-header__body">
+            <div class="fr-container">
+                <div class="fr-header__body-row">
+                    <div class="fr-header__brand fr-enlarge-link">
+                        <div class="fr-header__brand-top">
+                            <div class="fr-header__logo" style="display: flex; align-items: center; height: 100%;">
+  <img src="https://upload.wikimedia.org/wikipedia/fr/thumb/d/de/Logo_Le_Vésinet.svg/250px-Logo_Le_Vésinet.svg.png" style="max-height: 80px; margin-right: 15px;" alt="Logo Le Vésinet">
+</div>
+                        </div>
+                        <div class="fr-header__service">
+                            <a href="/" title="Retour à l'accueil">
+                                <p class="fr-header__service-title">Organigramme Mairie du Vésinet</p>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="fr-header__tools">
+                        <div class="fr-header__tools-links">
+                            <ul class="fr-btns-group">
+                                <li>
+                                    <button class="fr-btn fr-btn--secondary fr-icon-download-line fr-btn--icon-left"
+                                        id="btn-export-pdf">
+                                        Télécharger PDF
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="fr-container fr-my-4w">
+
+        <!-- SECTION 1 : RECHERCHE RAPIDE & ANNUAIRE -->
+        <!-- Accordéon permettant un accès direct aux agents sans navigation graphique -->
+        <section class="fr-accordion fr-mb-4w">
+            <h3 class="fr-accordion__title">
+                <button class="fr-accordion__btn" aria-expanded="false" aria-controls="quick-search-area">
+                    Recherche rapide / Annuaire
+                </button>
+            </h3>
+            <div class="fr-collapse" id="quick-search-area">
+                <p class="fr-text--sm fr-mb-1w">Utilisez ces filtres pour trouver un agent ou un service :</p>
+                <div class="fr-grid-row fr-grid-row--gutters fr-pt-2w" style="align-items: flex-end;">
+                    <!-- Menu déroulant -->
+                    <div class="fr-col-12 fr-col-md-6">
+                        <div class="fr-select-group">
+                            <label class="fr-label" for="quick-select-structure">Filtrer par bureau</label>
+                            <select class="fr-select" id="quick-select-structure">
+                                <option value="">Tous les bureaux</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Champ texte -->
+                    <div class="fr-col-12 fr-col-md-6">
+                        <div class="fr-search-bar" role="search">
+                            <label class="fr-label" for="quick-search-input">Rechercher</label>
+                            <input class="fr-input" placeholder="Nom, Prénom, Fonction..." type="search"
+                                id="quick-search-input">
+                            <button class="fr-btn" id="quick-search-btn">Rechercher</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2 : VUE GRAPHIQUE (ORGANIGRAMME) -->
+        <!-- Zone supérieure (Direction, Cabinet) -->
+        <div class="top-zone">
+            <div class="top-stack-left" id="top-left"></div>
+            <div class="top-center" id="top-center"></div>
+            <div class="top-stack-right" id="top-right"></div>
+        </div>
+
+        <!-- Grille principale à 4 colonnes (Sous-directions, Bureaux) -->
+        <div class="main-grid">
+            <div class="column-stack" id="col-1"></div>
+            <div class="column-stack" id="col-2"></div>
+            <div class="column-stack" id="col-3"></div>
+            <div class="column-stack" id="col-4"></div>
+        </div>
+
+        <!-- FENÊTRE MODALE : Détails du bureau / Pôle -->
+        <!-- Le contenu est injecté dynamiquement par app.js lors d'un clic sur une tuile -->
+        <dialog id="info-modal" class="fr-modal" aria-labelledby="modal-title" aria-modal="true">
+            <div class="fr-container fr-container--fluid fr-container-md">
+                <div class="fr-grid-row fr-grid-row--center">
+                    <div class="fr-col-12 fr-col-md-10 fr-col-lg-8">
+                        <div class="fr-modal__body">
+                            <div class="fr-modal__header">
+                                <button class="fr-btn--close fr-btn" aria-controls="info-modal"
+                                    id="btn-close-modal">Fermer</button>
+                            </div>
+                            <div class="fr-modal__content">
+                                <h1 id="modal-title" class="fr-modal__title">Titre du bureau</h1>
+                                <div id="modal-body">
+                                    <!-- Contenu injecté par JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </dialog>
+
+        <!-- Déclencheur natif caché pour DSFR -->
+        <button id="dsfr-hidden-modal-btn" data-fr-opened="false" aria-controls="info-modal"
+            style="display:none;"></button>
+
+    </main>
+
+
+
+    <!-- SCRIPTS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/core/core.module.min.js"></script>
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/component/accordion/accordion.module.min.js"></script>
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/component/modal/modal.module.min.js"></script>
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/scheme/scheme.module.min.js"></script>
+    <script>/**
+ * utils.js
+ * Utilitaires partagés pour le widget Organigramme SAAM.
+ */
+
+// --- CONFIGURATION GRIST (MAPPING DES COLONNES) ---
+
+// Noms des tables
+const TABLE_AGENTS = 'Base_Agent';
+const TABLE_STRUCTURES = 'Structures';
+const TABLE_CONFIG_LOGO = 'Config_Logo';
+
+// Mapping Config_Logo
+const COL_CONFIG_TEXTE_LOGO = 'Texte_Logo';
+const COL_CONFIG_MASQUER_LOGO = 'Masquer_Logo';
+
+// Mapping Base_Agent
+const COL_AGENT_NOM = 'Nom_d_usage_de_l_agent';
+const COL_AGENT_PRENOM = 'Prenom';
+const COL_AGENT_FONCTION = 'Fonction_de_l_agent';
+const COL_AGENT_STRUCT_REF = 'Structure_de_l_agent';
+const COL_AGENT_STRUCT_SUP = 'Structure_superieur_hierarchique';
+const COL_AGENT_MAIL = 'Mail_agent';
+const COL_AGENT_MAIL_GEN = 'Mail_generique';
+const COL_AGENT_TEL = 'Tel_';
+const COL_AGENT_TEL_PORT = 'Tel_PORT';
+const COL_AGENT_SITE = 'Site';
+const COL_AGENT_BUREAU = 'Bureau';
+const COL_AGENT_TELETRAVAIL = 'Jour_s_de_teletravail';
+const COL_AGENT_MISSIONS = 'Missions_du_poste';
+const COL_AGENT_PROJET = 'nom_du_projet';
+const COL_AGENT_ROLE_PROJET = 'Role_chef_projet_ou_participnt';
+const COL_AGENT_POLE = 'Pole_ou_section_';
+const COL_AGENT_DESC_POLE = 'Description_pole';
+const COL_AGENT_SECTEUR = 'Secteur_ou_cellule_';
+const COL_AGENT_DESC_SECTEUR = 'Description_secteur';
+
+// Mapping Structures
+const COL_STRUCT_CODE = 'Structure';
+const COL_STRUCT_LIBELLE = 'Libelle';
+const COL_STRUCT_POSITION = 'Code_Position';
+const COL_STRUCT_STYLE = 'Style_Special';
+const COL_STRUCT_DESC = 'Description_Structure';
+const COL_STRUCT_RESP = 'Responsable_Manuel';
+const COL_STRUCT_CHEF_SUP = 'Superieur_hierarchique';
+
+
+// --- SÉCURISATION ET FORMATAGE ---
+
+/**
+ * Retourne une chaîne, vide par défaut si la valeur est nulle.
+ */
+window.safeStr = function (val, def = "") {
+    return val === null || val === undefined ? def : String(val);
+};
+
+/**
+ * Échappe les caractères HTML (Protection XSS).
+ */
+window.escapeHtml = function (unsafe) {
+    if (unsafe === null || unsafe === undefined) return "";
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
+
+/**
+ * Traite une valeur pour injection sécurisée dans le DOM.
+ */
+window.safeHtml = function (val, def = "") {
+    return window.escapeHtml(window.safeStr(val, def));
+};
+
+/**
+ * Normalise une chaîne pour les comparaisons (minuscules, sans accents).
+ */
+window.normalizeString = function (str) {
+    if (!str) return "";
+    return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+};
+
+
+// --- GESTION DES DONNÉES GRIST ---
+
+/**
+ * Transforme le format colonne de Grist en format ligne (objets JS).
+ */
+window.transformColsToRows = function (cols) {
+    if (!cols || !cols.id) return [];
+    const rows = [];
+    for (let i = 0; i < cols.id.length; i++) {
+        let r = {};
+        for (const k in cols) r[k] = cols[k][i];
+        rows.push(r);
+    }
+    return rows;
+};
+
+/**
+ * Enrichit les données des agents avec des champs de recherche pré-calculés.
+ * Optimisation O(N) effectuée au chargement.
+ */
+window.enrichAgentsData = function (agentsArray) {
+    agentsArray.forEach(agent => {
+        const nom = safeStr(agent[COL_AGENT_NOM]);
+        const prenom = safeStr(agent[COL_AGENT_PRENOM]);
+
+        // Indexation des noms pour accélération des recherches
+        agent._fullname = normalizeString(`${prenom} ${nom}`);
+        agent._fullnameReverse = normalizeString(`${nom} ${prenom}`);
+    });
+    return agentsArray;
+};
+
+/**
+ * Crée un index Map des structures pour un accès instantané par ID.
+ */
+window.createStructureMap = function (structuresArray) {
+    const map = new Map();
+    structuresArray.forEach(s => map.set(s.id, s));
+    return map;
+};
+/**
+ * Résout une valeur de colonne Reference Grist vers un ID numérique.
+ * Grist peut retourner : un entier, un tableau [id, "label"], ou 0/null si vide.
+ */
+window.resolveGristRef = function (rawRef) {
+    if (Array.isArray(rawRef) && rawRef.length > 0) return rawRef[0];
+    if (typeof rawRef === 'number' && rawRef > 0) return rawRef;
+    return null;
+};
+
+/**
+ * Crée un index des agents regroupés par leur structure (bureau).
+ * Gère les deux formats possibles de Structure_de_l_agent :
+ *   - Reference Grist → ID numérique (ex: 2)
+ *   - Texte → code structure (ex: "SAAM A1")
+ * Les agents sont indexés par la clé brute (ID ou texte).
+ */
+window.createAgentsHierarchyMap = function (agentsArray) {
+    const map = new Map();
+    agentsArray.forEach(a => {
+        const raw = a[COL_AGENT_STRUCT_REF];
+
+        // Clé = ID numérique (si Reference) ou texte (si colonne Texte)
+        const refId = window.resolveGristRef(raw);
+        const key = refId || (typeof raw === 'string' ? raw.trim() : null);
+
+        if (key) {
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(a);
+        }
+    });
+    return map;
+};
+
+/**
+ * Identifie le nom du responsable d'une structure.
+ *
+ * Logique métier :
+ *   - Chaque agent a Structure_superieur_hierarchique qui indique
+ *     dans quel bureau travaille son N+1.
+ *   - Les agents « normaux » ont leur N+1 dans le MÊME bureau.
+ *   - Le CHEF du bureau a son N+1 dans un AUTRE bureau.
+ *
+ * Gère les colonnes de type Reference (ID numérique) ET Texte (code string).
+ */
+window.findResponsableName = function (structObject, agentsHierarchyMap) {
+    if (!structObject) return null;
+
+    const structId = structObject.id;
+    const structCode = safeStr(structObject[COL_STRUCT_CODE]).trim();
+
+    // 1. Priorité au responsable saisi manuellement (texte uniquement)
+    const rawResp = structObject[COL_STRUCT_RESP];
+    if (rawResp && typeof rawResp === 'string') {
+        const manualChef = rawResp.trim();
+        if (manualChef) return manualChef;
+    }
+
+    // 2. Détection automatique du chef
+    if (agentsHierarchyMap) {
+        // Chercher les agents de cette structure (par ID numérique OU par code texte)
+        const agentsInStruct = agentsHierarchyMap.get(structId) ||
+                               agentsHierarchyMap.get(structCode) ||
+                               [];
+
+        if (agentsInStruct.length > 0) {
+            // Le chef = l'agent dont le N+1 est dans un AUTRE bureau
+            const chef = agentsInStruct.find(a => {
+                const rawSup = a[COL_AGENT_STRUCT_SUP];
+
+                // Cas 1: Reference (ID numérique)
+                const supRefId = window.resolveGristRef(rawSup);
+                if (supRefId) {
+                    return supRefId !== structId;
+                }
+
+                // Cas 2: Texte (code structure)
+                const supText = safeStr(rawSup).trim();
+                if (supText) {
+                    return supText !== structCode;
+                }
+
+                // Pas de valeur → on ne peut pas déterminer
+                return false;
+            });
+
+            if (chef) {
+                const p = safeStr(chef[COL_AGENT_PRENOM]);
+                const n = safeStr(chef[COL_AGENT_NOM]);
+                return `${p} ${n}`.trim();
+            }
+        }
+    }
+
+    // 3. Dernier recours : champ Superieur_hierarchique sur la structure
+    const rawChefSup = structObject[COL_STRUCT_CHEF_SUP];
+    if (rawChefSup && typeof rawChefSup === 'string') {
+        const chefSup = rawChefSup.trim();
+        if (chefSup) return chefSup;
+    }
+
+    return null;
+};
+
+
+
+// --- INTERACTIONS UI ---
+
+/**
+ * Limite la fréquence d'exécution d'une fonction (debounce).
+ */
+window.debounce = function (func, wait) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+};
+
+/**
+ * Copie un texte dans le presse-papier avec retour visuel.
+ */
+window.copyToClipboard = function (text, btnElement) {
+    if (!navigator.clipboard) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showCopyTooltip(btnElement);
+        } catch (err) {
+            console.error('Erreur technique lors de la copie', err);
+        }
+        document.body.removeChild(textArea);
+        return;
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+        showCopyTooltip(btnElement);
+    }).catch(err => {
+        console.error('Erreur lors de l\'accès au presse-papier', err);
+    });
+};
+
+/**
+ * Affiche une bulle de confirmation temporaire après une copie.
+ */
+function showCopyTooltip(element) {
+    if (element.querySelector('.copy-tooltip')) return;
+
+    const tooltip = document.createElement('span');
+    tooltip.className = 'copy-tooltip';
+    tooltip.innerHTML = '<span class="fr-icon-check-line fr-icon--sm fr-mr-1v"></span> Copié !';
+
+    element.style.position = 'relative';
+    element.appendChild(tooltip);
+
+    setTimeout(() => {
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    }, 2000);
+}
+
+/**
+ * Applique la configuration dynamique du logo (Masquage / Texte).
+ */
+window.applyLogoConfig = function (configData) {
+    if (!configData || configData.length === 0) return;
+
+    const configRow = configData[0];
+    const logoContainer = document.querySelector('.fr-header__logo');
+
+    if (!logoContainer) return;
+
+    // 1. Masquage conditionnel
+    if (configRow[COL_CONFIG_MASQUER_LOGO]) {
+        logoContainer.style.display = 'none';
+        return;
+    }
+
+    // 2. Personnalisation du texte
+    const customText = safeStr(configRow[COL_CONFIG_TEXTE_LOGO]).trim();
+    if (customText) {
+        const pLogo = logoContainer.querySelector('.fr-logo');
+        if (pLogo) {
+            pLogo.innerHTML = safeHtml(customText).replace(/\n/g, '<br>');
+        }
+    }
+}
+</script>
+    <script>// ==========================================
+// INITIALISATION
+// ==========================================
+// Note: Les configurations de mapping colonnes sont désormais centralisées dans utils.js
+// INITIALISATION
+// ==========================================
+grist.ready({ requiredAccess: 'read table' });
+document.addEventListener('DOMContentLoaded', init);
+
+let allAgents = [];
+let allStructures = [];
+let structureMap = new Map(); // Index O(1) pour les perfs
+let agentsHierarchyMap = new Map(); // Index O(1) pour la hiérarchie
+
+async function init() {
+    try {
+        console.log("Chargement Organigramme Mairie (Interne Grist)...");
+
+        // 1. Récupération directe via Grist Plugin API
+        const tables = [TABLE_AGENTS, TABLE_STRUCTURES, TABLE_CONFIG_LOGO];
+        const data = {};
+
+        await Promise.all(tables.map(async (name) => {
+            try {
+                const result = await grist.docApi.fetchTable(name);
+                data[name] = window.transformColsToRows(result);
+            } catch (err) {
+                console.warn(`Table ${name} non trouvée ou inaccessible.`, err);
+                data[name] = []; // Fallback si la table de config n'existe pas encore
+            }
+        }));
+
+        allAgents = window.enrichAgentsData(data[TABLE_AGENTS]); // O(N) Cache les strings
+        agentsHierarchyMap = window.createAgentsHierarchyMap(allAgents); // O(N) Cache hiérarchie
+        allStructures = data[TABLE_STRUCTURES];
+        structureMap = window.createStructureMap(allStructures); // Index Hash Map O(1)
+
+        // Application de la configuration du Logo
+        applyLogoConfig(data[TABLE_CONFIG_LOGO]);
+
+        // Lancement du rendu
+        renderTopZone();   // Partie Supérieure (DG, Cabinet...)
+        renderColumns();   // Colonnes principales
+        initQuickSearch(); // Barre de recherche rapide (Accordéon)
+
+        // Exposition sécurisée via un Accessor global pour le PDF ou d'autres modules
+        window.getOrganigrammeData = () => ({
+            agents: allAgents,
+            structures: allStructures
+        });
+
+    } catch (e) {
+        console.error("ERREUR :", e);
+        document.querySelector('.main-grid').innerHTML = `<div class="fr-alert fr-alert--error">${e.message}</div>`;
+    }
+}
+
+// ==========================================
+// CONFIGURATION LOGO
+// ==========================================
+function applyLogoConfig(configData) {
+    if (!configData || configData.length === 0) return; // Pas de config
+
+    const configRow = configData[0]; // On prend la première ligne de configuration
+    const logoContainer = document.querySelector('.fr-header__logo');
+
+    if (!logoContainer) return;
+
+    // 1. Masquer le logo si demandé (toggle booléen)
+    if (configRow[COL_CONFIG_MASQUER_LOGO]) {
+        logoContainer.style.display = 'none';
+        return;
+    }
+
+    // 2. Changer le texte du logo si fourni
+    const customText = safeStr(configRow[COL_CONFIG_TEXTE_LOGO]).trim();
+    if (customText) {
+        const pLogo = logoContainer.querySelector('.fr-logo');
+        if (pLogo) {
+            // On autorise un HTML très basique type <br> souvent mis par défaut,
+            // mais on passe par notre outil XSS.
+            // Vu que Grist ne permet pas de taper du HTML riche facilement dans un champ texte,
+            // on remplace manuellement les \n par des <br>
+            pLogo.innerHTML = safeHtml(customText).replace(/\n/g, '<br>');
+        }
+    }
+}
+
+// ==========================================
+// ==========================================
+// RENDU VISUEL (GRILLE)
+// ==========================================
+
+// ... (renderTopZone, renderColumns, createDsfrTile inchangés, juste s'assurer que createDsfrTile utilise bien les nouvelles fns locales)
+
+// Affiche la zone du haut (Directeur G., Cabinet, etc.)
+function renderTopZone() {
+    const left = document.getElementById('top-left');
+    if (left) getStructuresByPos('TOP_LEFT').forEach(s => createDsfrTile(left, s));
+
+    const center = document.getElementById('top-center');
+    const centerStructs = getStructuresByPos('TOP_CENTER');
+    // Le chef au centre a un style spécifique (tile-chef)
+    if (center && centerStructs.length > 0) createDsfrTile(center, centerStructs[0], 'tile-chef');
+
+    const right = document.getElementById('top-right');
+    if (right) getStructuresByPos('TOP_RIGHT').forEach(s => createDsfrTile(right, s));
+}
+
+// Affiche les 4 colonnes principales
+function renderColumns() {
+    for (let i = 1; i <= 4; i++) {
+        const container = document.getElementById(`col-${i}`);
+        if (!container) continue;
+
+        // Tête de Colonne (taille fixe via CSS .tile-head)
+        const heads = getStructuresByPos(`COL${i}_HEAD`);
+        if (heads.length > 0) createDsfrTile(container, heads[0], 'tile-head');
+
+        // Sous-bureaux (Tuiles standards)
+        const subs = getStructuresByPos(`COL${i}_SUB`);
+        subs.forEach(sub => createDsfrTile(container, sub));
+    }
+}
+
+/**
+ * CRÉATION HTML D'UNE TUILE DSFR
+ * Gère l'affichage standard et les variantes (pointillé, chef...)
+ */
+function createDsfrTile(container, struct, extraClass = '') {
+    const codeBureau = window.safeHtml(struct[COL_STRUCT_CODE]).trim();
+    const libelle = window.safeHtml(struct[COL_STRUCT_LIBELLE], "Sans nom");
+    const resp = window.safeHtml(window.findResponsableName(struct, agentsHierarchyMap));
+    const specialStyle = window.safeStr(struct[COL_STRUCT_STYLE]).toLowerCase();
+
+    // Gestion du style pointillé (ex: Cellule Communication)
+    if (specialStyle.includes('pointill')) {
+        extraClass += ' tile-dashed';
+    }
+
+    const div = document.createElement('div');
+    // fr-enlarge-link permet de rendre toute la tuile cliquable via le <a> interne
+    div.className = `fr-tile fr-enlarge-link fr-tile--no-icon ${extraClass}`;
+
+    // Header (Code du bureau, ex: SAAM A)
+    const headerHtml = codeBureau ? `<div class="tile-header">${codeBureau}</div>` : '';
+
+    // Bloc Responsable (Affiché en bas de tuile)
+    let respHtml = '';
+    if (resp) {
+        respHtml = `
+        <div class="tile-resp-container">
+            <div class="tile-separator"></div>
+            <span class="tile-resp-name">${resp}</span>
+        </div>`;
+    }
+
+    div.innerHTML = `
+        ${headerHtml}
+        <div class="fr-tile__body">
+            <div class="fr-tile__content">
+                <h3 class="fr-tile__title">
+                    <a href="#">${libelle}</a>
+                </h3>
+            </div>
+            ${respHtml}
+        </div>
+    `;
+
+    // Clic sur la tuile -> Ouverture Modale
+    div.querySelector('a').addEventListener('click', (e) => {
+        e.preventDefault();
+        openModalForStructure(struct.id);
+    });
+
+    container.appendChild(div);
+}
+
+
+// ==========================================
+// LOGIQUE MODALE DE DÉTAIL
+// ==========================================
+
+window.openModalForStructure = function (structId) {
+    if (!structId) return;
+    const struct = allStructures.find(s => s.id === structId);
+    if (!struct) return;
+
+    const title = safeStr(struct[COL_STRUCT_LIBELLE]);
+    const respNameRaw = findResponsableName(struct, agentsHierarchyMap);
+    const respName = safeHtml(respNameRaw);
+
+    // Recherche des détails de l'agent responsable (via cache normalisé)
+    let respAgent = null;
+    if (respNameRaw) {
+        const target = window.normalizeString(respNameRaw);
+        respAgent = allAgents.find(a =>
+            (a._fullname && a._fullname.includes(target)) ||
+            (a._fullnameReverse && a._fullnameReverse.includes(target))
+        );
+    }
+
+    let htmlContent = '';
+
+    // 1. Carte du Responsable
+    if (respNameRaw) {
+        const fct = respAgent ? safeHtml(respAgent[COL_AGENT_FONCTION]) : "Responsable";
+        const emailAgent = respAgent ? safeHtml(respAgent[COL_AGENT_MAIL]) : "";
+        const emailGeneric = respAgent ? safeHtml(respAgent['Mail_generique']) : "";
+        const tel = respAgent ? safeHtml(respAgent[COL_AGENT_TEL]) : "";
+        const mobile = respAgent ? safeHtml(respAgent['Tel_PORT']) : "";
+
+
+
+        htmlContent += `
+        <div class="fr-card fr-card--no-border fr-mb-2w">
+            <div class="fr-card__body">
+                <div class="fr-card__content">
+                    <h3 class="fr-card__title">
+                        <span class="fr-icon-user-star-line fr-mr-1w" aria-hidden="true"></span>
+                        ${respName}
+                    </h3>
+                    <p class="fr-card__desc text-bold">${fct}</p>
+                    <div class="fr-card__start">
+                        <ul class="fr-badges-group">
+                             ${emailAgent ? `<li><button onclick="copyToClipboard('${emailAgent.toLowerCase()}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn" style="text-transform: none; display: inline-flex; width: 100%; white-space: normal; text-align: left; cursor: pointer; border: none; background: var(--background-contrast-info); color: var(--text-action-high-blue-france);" title="Copier l'adresse email">${emailAgent.toLowerCase()}</button></li>` : ''}
+                             ${emailGeneric ? `<li><button onclick="copyToClipboard('${emailGeneric.toLowerCase()}', this)" class="fr-badge fr-badge--purple-glycine fr-badge--no-icon copy-btn" style="text-transform: none; font-style: italic; display: inline-flex; width: 100%; white-space: normal; text-align: left; cursor: pointer; border: none; background: var(--background-contrast-purple-glycine); color: var(--text-action-high-purple-glycine);" title="Copier l'adresse email">Générique : ${emailGeneric.toLowerCase()}</button></li>` : ''}
+                             ${tel ? `<li><button onclick="copyToClipboard('${tel}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn" style="text-transform: none; cursor: pointer; border: none; background: var(--background-contrast-info); color: var(--text-action-high-blue-france);" title="Copier le numéro">Fixe : ${tel}</button></li>` : ''}
+                             ${mobile ? `<li><button onclick="copyToClipboard('${mobile}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn" style="text-transform: none; cursor: pointer; border: none; background: var(--background-contrast-info); color: var(--text-action-high-blue-france);" title="Copier le numéro">Mob. : ${mobile}</button></li>` : ''}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    } else {
+        htmlContent += `
+            <div class="fr-alert fr-alert--warning fr-mb-2w">
+                <p>Aucun responsable identifié pour ce service.</p>
+            </div>
+            `;
+    }
+
+    // 2. Bouton vers la liste complète (Page Recherche)
+    htmlContent += `
+            <div class="fr-grid-row fr-grid-row--center fr-mt-3w">
+                <a href="search.html?structure=${structId}" class="fr-btn fr-btn--secondary fr-btn--icon-right fr-icon-arrow-right-line">
+                    Voir toute l'équipe
+                </a>
+            </div>
+            `;
+
+    // Injection dans la modale et affichage
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-body').innerHTML = htmlContent;
+
+    // Déclencheur officiel DSFR (qui gère son propre backdrop et sa fermeture)
+    document.getElementById('dsfr-hidden-modal-btn').click();
+};
+
+// ==========================================
+// UTILITAIRES ET LOGIQUE MÉTIER
+// ==========================================
+
+// Filtre les structures par leur Position (Code saisi dans Grist)
+function getStructuresByPos(code) {
+    return allStructures.filter(s => window.safeStr(s[COL_STRUCT_POSITION]).trim() === code);
+}
+
+// Gestion des événements de fermeture de la modale gérée nativement par DSFR
+// Plus besoin de `.showModal()` ou `.close()` manuels du navigateur web.
+
+// Initialisation de la recherche rapide (Accordéon)
+function initQuickSearch() {
+    // 1. Peupler le select
+    const select = document.getElementById('quick-select-structure');
+    if (!select) return;
+
+    const options = allStructures.map(struct => {
+        const code = window.safeStr(struct['Structure']).trim();
+        const libelle = window.safeStr(struct[COL_STRUCT_LIBELLE]).trim();
+        let label = libelle;
+        if (code && code.toLowerCase() !== libelle.toLowerCase()) {
+            label = `${code} - ${libelle} `;
+        }
+        return { id: struct.id, label: label };
+    });
+
+    options.sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.id;
+        option.textContent = opt.label;
+        select.appendChild(option);
+    });
+
+    // 2. Gérer le bouton et l'entrée
+    const btn = document.getElementById('quick-search-btn');
+    const input = document.getElementById('quick-search-input');
+
+    if (btn) {
+        // Clic bouton
+        btn.addEventListener('click', triggerQuickSearch);
+
+        // Touche Entrée
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') triggerQuickSearch();
+        });
+
+        function triggerQuickSearch() {
+            const structId = select.value;
+            const query = input.value.trim();
+
+            const params = new URLSearchParams();
+            if (structId) params.set('structure', structId);
+            if (query) params.set('q', query);
+
+            const queryString = params.toString();
+            window.location.href = queryString ? `search.html?${queryString}` : 'search.html';
+        }
+    }
+}</script>
+    <script type="module">
+        import { initPdfExport } from './pdf-export.js';
+
+        // Initialize PDF Export listener once DOM is ready
+        document.addEventListener("DOMContentLoaded", () => {
+            initPdfExport(() => window.getOrganigrammeData ? window.getOrganigrammeData() : null);
+        });
+    </script>
+</body>
+
+</html>
