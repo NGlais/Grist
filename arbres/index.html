@@ -4,132 +4,95 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tableau de Bord — Arbres du Vésinet</title>
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --green-dark: #1a5c38;
-      --green-mid: #2d8653;
-      --green-light: #4aba7a;
-      --green-pale: #e8f5ee;
-      --amber: #f59e0b;
-      --red: #ef4444;
-      --blue: #3b82f6;
-      --bg: #f0f7f3;
-      --card: #ffffff;
-      --text: #1a2e1e;
-      --text-muted: #5a7a62;
-      --border: #c8e6d4;
-      --shadow: 0 2px 16px rgba(26,92,56,0.10);
+      --green-dark: #1a5c38; --green-mid: #2d8653; --green-light: #4aba7a;
+      --green-pale: #e8f5ee; --amber: #f59e0b; --red: #ef4444; --blue: #3b82f6;
+      --bg: #f0f7f3; --card: #ffffff; --text: #1a2e1e; --text-muted: #5a7a62;
+      --border: #c8e6d4; --shadow: 0 2px 16px rgba(26,92,56,0.10);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
 
     .header {
-      background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 60%, var(--green-light) 100%);
-      color: white; padding: 20px 28px 16px; display: flex; align-items: center; gap: 16px;
+      background: linear-gradient(135deg, #1a5c38 0%, #2d8653 60%, #4aba7a 100%);
+      color: white; padding: 20px 28px; display: flex; align-items: center; gap: 16px;
     }
     .header-icon { font-size: 2.4rem; }
-    .header-text h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.5px; }
+    .header-text h1 { font-size: 1.35rem; font-weight: 800; }
     .header-text p { font-size: 0.78rem; opacity: 0.8; margin-top: 2px; }
-    .header-count {
+    .header-badge {
       margin-left: auto; background: rgba(255,255,255,0.18);
       border: 1px solid rgba(255,255,255,0.3); border-radius: 12px;
       padding: 8px 18px; text-align: center;
     }
-    .header-count .num { font-size: 1.8rem; font-weight: 800; line-height: 1; }
-    .header-count .lbl { font-size: 0.68rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.8px; }
+    .header-badge .num { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+    .header-badge .lbl { font-size: 0.65rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.8px; }
+    .updated { font-size: 0.65rem; opacity: 0.6; margin-left: 8px; }
 
-    .loading {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 60vh; gap: 16px; color: var(--green-mid);
-    }
-    .spinner {
-      width: 48px; height: 48px; border: 4px solid var(--border);
-      border-top-color: var(--green-mid); border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .main { padding: 20px; }
 
-    .main { padding: 20px; display: none; }
-
-    .kpi-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 14px; margin-bottom: 20px;
-    }
+    /* KPIs */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
     .kpi {
       background: var(--card); border-radius: 16px; padding: 18px 16px;
       box-shadow: var(--shadow); border: 1px solid var(--border);
       position: relative; overflow: hidden;
     }
-    .kpi::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
-      background: linear-gradient(90deg, var(--green-mid), var(--green-light));
-    }
-    .kpi.amber::before { background: linear-gradient(90deg, #d97706, var(--amber)); }
-    .kpi.red::before { background: linear-gradient(90deg, #dc2626, var(--red)); }
-    .kpi.blue::before { background: linear-gradient(90deg, #2563eb, var(--blue)); }
-    .kpi-icon { font-size: 1.5rem; margin-bottom: 8px; }
-    .kpi-value { font-size: 1.6rem; font-weight: 800; color: var(--green-dark); line-height: 1; }
+    .kpi::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: linear-gradient(90deg, #2d8653, #4aba7a); }
+    .kpi.amber::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+    .kpi.red::before   { background: linear-gradient(90deg, #dc2626, #ef4444); }
+    .kpi.blue::before  { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+    .kpi-icon { font-size: 1.4rem; margin-bottom: 8px; }
+    .kpi-value { font-size: 1.7rem; font-weight: 800; color: #1a5c38; line-height: 1; }
     .kpi.amber .kpi-value { color: #92400e; }
-    .kpi.red .kpi-value { color: #991b1b; }
-    .kpi.blue .kpi-value { color: #1d4ed8; }
-    .kpi-unit { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px; }
-    .kpi-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+    .kpi.red   .kpi-value { color: #991b1b; }
+    .kpi.blue  .kpi-value { color: #1d4ed8; }
+    .kpi-unit  { font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 2px; }
+    .kpi-label { font-size: 0.74rem; color: var(--text-muted); margin-top: 6px; }
 
-    .charts-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 16px; margin-bottom: 20px;
+    /* ECO */
+    .eco-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .eco {
+      border-radius: 16px; padding: 20px 18px; color: white;
+      background: linear-gradient(135deg, #1a5c38, #2d8653);
+      box-shadow: 0 4px 20px rgba(26,92,56,0.22);
     }
-    .chart-card {
+    .eco.blue   { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+    .eco.amber  { background: linear-gradient(135deg, #92400e, #d97706); }
+    .eco-icon  { font-size: 1.8rem; margin-bottom: 10px; }
+    .eco-value { font-size: 1.45rem; font-weight: 800; line-height: 1.1; }
+    .eco-label { font-size: 0.7rem; opacity: 0.85; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* CHARTS */
+    .charts-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .chart-full { margin-bottom: 20px; }
+    .chart-2    { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card {
       background: var(--card); border-radius: 16px; padding: 20px;
       box-shadow: var(--shadow); border: 1px solid var(--border);
     }
-    .chart-card.wide { grid-column: 1 / -1; }
-    .chart-title {
-      font-size: 0.85rem; font-weight: 700; color: var(--green-dark);
-      text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 16px;
-      display: flex; align-items: center; gap: 6px;
+    .card-title {
+      font-size: 0.82rem; font-weight: 700; color: #1a5c38;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 6px;
     }
-    .chart-title span { font-size: 1rem; }
-    .chart-wrap { position: relative; height: 220px; }
-    .chart-wrap.tall { height: 280px; }
+    .h220 { position: relative; height: 220px; }
+    .h280 { position: relative; height: 280px; }
+    .h300 { position: relative; height: 300px; }
 
-    .health-row {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px; margin-bottom: 20px;
-    }
-    .health-card {
-      background: var(--card); border-radius: 16px; padding: 20px;
-      box-shadow: var(--shadow); border: 1px solid var(--border);
-    }
+    /* STATIONS */
     .bar-list { display: flex; flex-direction: column; gap: 10px; }
-    .bar-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
-    .bar-label { font-size: 0.8rem; font-weight: 500; color: var(--text); }
-    .bar-count { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); }
-    .bar-track { background: #e5e7eb; border-radius: 999px; height: 8px; overflow: hidden; }
+    .bar-row  { }
+    .bar-hd   { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .bar-name { font-size: 0.78rem; font-weight: 500; }
+    .bar-cnt  { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
+    .bar-bg   { background: #e5e7eb; border-radius: 999px; height: 7px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 999px; }
 
-    .eco-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px; margin-bottom: 20px;
-    }
-    .eco-card {
-      background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 100%);
-      color: white; border-radius: 16px; padding: 20px 18px;
-      box-shadow: 0 4px 20px rgba(26,92,56,0.25);
-    }
-    .eco-card.blue-card { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
-    .eco-card.amber-card { background: linear-gradient(135deg, #92400e, #f59e0b); }
-    .eco-icon { font-size: 1.8rem; margin-bottom: 10px; }
-    .eco-value { font-size: 1.5rem; font-weight: 800; line-height: 1; }
-    .eco-label { font-size: 0.72rem; opacity: 0.85; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-    .footer {
-      text-align: center; padding: 12px; font-size: 0.7rem; color: var(--text-muted);
-      border-top: 1px solid var(--border);
-    }
+    .footer { text-align:center; padding:14px; font-size:0.68rem; color:var(--text-muted); border-top:1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -137,241 +100,202 @@
 <div class="header">
   <div class="header-icon">🌳</div>
   <div class="header-text">
-    <h1>Arbres du Vésinet</h1>
-    <p>Base de données Grality — Tableau de bord patrimonial</p>
+    <h1>Patrimoine Arboré du Vésinet</h1>
+    <p>Base de données Grality — Tableau de bord patrimonial <span class="updated">· données au 11 mai 2026</span></p>
   </div>
-  <div class="header-count">
-    <div class="num" id="total-count">—</div>
+  <div class="header-badge">
+    <div class="num">5 000</div>
     <div class="lbl">arbres inventoriés</div>
   </div>
 </div>
 
-<div class="loading" id="loading">
-  <div class="spinner"></div>
-  <p id="loading-msg">Chargement des données…</p>
-</div>
+<div class="main">
 
-<div class="main" id="main">
-  <div class="kpi-grid" id="kpi-grid"></div>
-  <div class="eco-grid" id="eco-grid"></div>
-  <div class="charts-grid">
-    <div class="chart-card">
-      <div class="chart-title"><span>🌿</span> Répartition Feuillu / Résineux</div>
-      <div class="chart-wrap"><canvas id="chart-ordre"></canvas></div>
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-icon">🌿</div>
+      <div class="kpi-value">152<span class="kpi-unit">espèces</span></div>
+      <div class="kpi-label">Diversité spécifique</div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title"><span>💪</span> Vigueur des arbres</div>
-      <div class="chart-wrap"><canvas id="chart-vigueur"></canvas></div>
+    <div class="kpi">
+      <div class="kpi-icon">🌟</div>
+      <div class="kpi-value">30<span class="kpi-unit">arbres</span></div>
+      <div class="kpi-label">Arbres remarquables</div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title"><span>⚠️</span> Niveau de risque</div>
-      <div class="chart-wrap"><canvas id="chart-risque"></canvas></div>
+    <div class="kpi red">
+      <div class="kpi-icon">💀</div>
+      <div class="kpi-value">120<span class="kpi-unit">arbres</span></div>
+      <div class="kpi-label">Arbres morts</div>
     </div>
-    <div class="chart-card wide">
-      <div class="chart-title"><span>🏆</span> Top 10 espèces les plus représentées</div>
-      <div class="chart-wrap tall"><canvas id="chart-especes"></canvas></div>
+    <div class="kpi amber">
+      <div class="kpi-icon">🚨</div>
+      <div class="kpi-value">25<span class="kpi-unit">arbres</span></div>
+      <div class="kpi-label">Risque élevé</div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-icon">🗺️</div>
+      <div class="kpi-value">8+<span class="kpi-unit">sites</span></div>
+      <div class="kpi-label">Stations inventoriées</div>
     </div>
   </div>
-  <div class="health-row">
-    <div class="health-card">
-      <div class="chart-title"><span>📍</span> Top stations (sites)</div>
-      <div class="bar-list" id="stations-bars"></div>
+
+  <!-- ECO -->
+  <div class="eco-row">
+    <div class="eco">
+      <div class="eco-icon">🌫️</div>
+      <div class="eco-value">5 915 t</div>
+      <div class="eco-label">Stockage CO₂ total</div>
     </div>
-    <div class="health-card">
-      <div class="chart-title"><span>🔬</span> Cote sanitaire — distribution</div>
-      <div class="chart-wrap"><canvas id="chart-cote"></canvas></div>
+    <div class="eco">
+      <div class="eco-icon">💨</div>
+      <div class="eco-value">100 t/an</div>
+      <div class="eco-label">Captation CO₂ annuelle</div>
+    </div>
+    <div class="eco blue">
+      <div class="eco-icon">☁️</div>
+      <div class="eco-value">277 454 m²</div>
+      <div class="eco-label">Surface canopée totale</div>
+    </div>
+    <div class="eco blue">
+      <div class="eco-icon">💧</div>
+      <div class="eco-value">72 822 kg/an</div>
+      <div class="eco-label">Production d'oxygène</div>
+    </div>
+    <div class="eco amber">
+      <div class="eco-icon">🌡️</div>
+      <div class="eco-value">11,7 M€/an</div>
+      <div class="eco-label">Valeur rafraîchissement</div>
+    </div>
+    <div class="eco amber">
+      <div class="eco-icon">🦋</div>
+      <div class="eco-value">24,4 / 100</div>
+      <div class="eco-label">Biodiversité moyenne</div>
     </div>
   </div>
+
+  <!-- 3 graphiques en ligne -->
+  <div class="charts-3">
+    <div class="card">
+      <div class="card-title"><span>🌿</span> Feuillu vs Résineux</div>
+      <div class="h220"><canvas id="c-ordre"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>💪</span> Vigueur</div>
+      <div class="h220"><canvas id="c-vigueur"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>⚠️</span> Niveau de risque</div>
+      <div class="h220"><canvas id="c-risque"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Top 10 espèces -->
+  <div class="chart-full">
+    <div class="card">
+      <div class="card-title"><span>🏆</span> Top 10 espèces les plus représentées</div>
+      <div class="h300"><canvas id="c-especes"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Stations + Cote sanitaire -->
+  <div class="chart-2">
+    <div class="card">
+      <div class="card-title"><span>📍</span> Top stations (sites)</div>
+      <div class="bar-list" id="stations"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🔬</span> Distribution — Cote sanitaire</div>
+      <div class="h280"><canvas id="c-cote"></canvas></div>
+    </div>
+  </div>
+
 </div>
 
-<div class="footer">Données Grality Vésinet · Tableau de bord généré dynamiquement depuis Grist</div>
+<div class="footer">Grality Vésinet · 5 000 arbres inventoriés · Données extraites le 11 mai 2026</div>
 
 <script>
-const COLORS_GREEN = ['#1a5c38','#2d8653','#3da666','#4aba7a','#6fd49a','#96e3b5','#bdf0d0','#d8f7e8'];
-const COLORS_RISK  = {'Faible':'#4aba7a','Moyen':'#f59e0b','Élevé':'#ef4444'};
-const COLORS_VIG   = {'Bonne':'#2d8653','Moyenne':'#f59e0b','Faible':'#f97316','Mort':'#ef4444'};
-const DOC_ID = '7zBBDabuZJyqGLCHFmA6rn';
-const TABLE  = 'Arbres';
+const GREENS = ['#1a5c38','#2d8653','#3da666','#4aba7a','#6fd49a','#96e3b5','#bdf0d0','#d8f7e8','#1a5c38','#2d8653'];
 
-function fmt(n) {
-  if (!n || isNaN(n)) return '0';
-  if (n >= 1000000) return (n/1000000).toFixed(1) + ' M';
-  if (n >= 1000)    return (n/1000).toFixed(1) + ' k';
-  return Math.round(n).toLocaleString('fr-FR');
-}
-
-// Accès aux champs quel que soit le format de l'enregistrement
-function getF(r) { return r.fields || r; }
-
-function counter(arr, key) {
-  const c = {};
-  arr.forEach(r => {
-    const v = String(getF(r)[key] ?? '');
-    c[v] = (c[v]||0)+1;
-  });
-  return c;
-}
-
-let built = false;
-
-function buildDashboard(records) {
-  if (built) return;
-  built = true;
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('main').style.display = 'block';
-  document.getElementById('total-count').textContent = records.length.toLocaleString('fr-FR');
-  buildKPIs(records);
-  buildEco(records);
-  buildCharts(records);
-  buildStations(records);
-}
-
-function buildKPIs(records) {
-  const remarquables = records.filter(r => getF(r).Remarquable === 'Oui').length;
-  const morts        = records.filter(r => getF(r).Mort === 'Oui').length;
-  const risqueEleve  = records.filter(r => getF(r).Risque === 'Élevé').length;
-  const species      = new Set(records.map(r => getF(r).Nom_vernaculaire).filter(Boolean)).size;
-  const kpis = [
-    { icon:'🌟', value: remarquables, unit:'arbres', label:'Arbres remarquables', cls:'' },
-    { icon:'🧬', value: species,      unit:'espèces', label:'Diversité spécifique', cls:'blue' },
-    { icon:'💀', value: morts,        unit:'arbres', label:'Arbres morts', cls:'red' },
-    { icon:'🚨', value: risqueEleve,  unit:'arbres', label:'Risque élevé', cls:'amber' },
-  ];
-  const grid = document.getElementById('kpi-grid');
-  grid.innerHTML = kpis.map(k => `
-    <div class="kpi ${k.cls}">
-      <div class="kpi-icon">${k.icon}</div>
-      <div class="kpi-value">${fmt(k.value)}<span class="kpi-unit">${k.unit}</span></div>
-      <div class="kpi-label">${k.label}</div>
-    </div>`).join('');
-}
-
-function buildEco(records) {
-  const sum = key => records.reduce((s,r) => s + (Number(getF(r)[key]) || 0), 0);
-  const co2T  = sum('Stockage_total_CO2_kg_');
-  const co2A  = sum('Stockage_annuel_CO2_kg_');
-  const canop = sum('Canopee_de_l_arbre_m2_');
-  const o2    = sum('Production_d_oxygene_kg_an_');
-  const frais = sum('Rafraichissement_an_');
-  const bVals = records.map(r => Number(getF(r).Potentiel_de_biodiversite_100_)||0).filter(v=>v>0);
-  const biod  = bVals.length ? bVals.reduce((a,b)=>a+b,0)/bVals.length : 0;
-
-  const ecos = [
-    { icon:'🌫️', value: fmt(co2T/1000)+' t',   label:'Stockage CO₂ total', cls:'' },
-    { icon:'💨', value: fmt(co2A)+' kg/an',      label:'Captation CO₂ annuelle', cls:'' },
-    { icon:'☁️', value: fmt(canop)+' m²',        label:'Surface canopée totale', cls:'blue-card' },
-    { icon:'💧', value: fmt(o2)+' kg/an',         label:"Production d'oxygène", cls:'blue-card' },
-    { icon:'🌡️', value: fmt(frais)+'€/an',       label:'Valeur rafraîchissement', cls:'amber-card' },
-    { icon:'🦋', value: biod.toFixed(1)+'/100',  label:'Biodiversité moyenne', cls:'amber-card' },
-  ];
-  document.getElementById('eco-grid').innerHTML = ecos.map(e => `
-    <div class="eco-card ${e.cls}">
-      <div class="eco-icon">${e.icon}</div>
-      <div class="eco-value">${e.value}</div>
-      <div class="eco-label">${e.label}</div>
-    </div>`).join('');
-}
-
-function buildCharts(records) {
-  // Feuillu / Résineux
-  const ordreC = counter(records, 'Ordre');
-  const oKeys = Object.keys(ordreC).filter(k=>k);
-  new Chart(document.getElementById('chart-ordre'), {
-    type:'doughnut',
-    data:{ labels:oKeys, datasets:[{ data:oKeys.map(k=>ordreC[k]), backgroundColor:['#2d8653','#6fd49a','#d1d5db'], borderWidth:2, borderColor:'white' }] },
-    options:{ plugins:{ legend:{ position:'bottom' } }, cutout:'65%', maintainAspectRatio:false }
-  });
-
-  // Vigueur
-  const vigC = counter(records, 'Vigueur');
-  const vL = ['Bonne','Moyenne','Faible','Mort'].filter(k=>vigC[k]);
-  new Chart(document.getElementById('chart-vigueur'), {
-    type:'doughnut',
-    data:{ labels:vL, datasets:[{ data:vL.map(k=>vigC[k]||0), backgroundColor:vL.map(k=>COLORS_VIG[k]||'#ccc'), borderWidth:2, borderColor:'white' }] },
-    options:{ plugins:{ legend:{ position:'bottom' } }, cutout:'65%', maintainAspectRatio:false }
-  });
-
-  // Risque
-  const risqC = counter(records, 'Risque');
-  const rL = ['Faible','Moyen','Élevé'].filter(k=>risqC[k]);
-  new Chart(document.getElementById('chart-risque'), {
-    type:'doughnut',
-    data:{ labels:rL, datasets:[{ data:rL.map(k=>risqC[k]||0), backgroundColor:rL.map(k=>COLORS_RISK[k]||'#ccc'), borderWidth:2, borderColor:'white' }] },
-    options:{ plugins:{ legend:{ position:'bottom' } }, cutout:'65%', maintainAspectRatio:false }
-  });
-
-  // Top 10 espèces
-  const nomC = counter(records, 'Nom_vernaculaire');
-  const top10 = Object.entries(nomC).filter(([k])=>k).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  new Chart(document.getElementById('chart-especes'), {
-    type:'bar',
-    data:{ labels:top10.map(e=>e[0]), datasets:[{ data:top10.map(e=>e[1]), backgroundColor:COLORS_GREEN, borderRadius:6 }] },
-    options:{ indexAxis:'y', maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ grid:{color:'#f0f0f0'} }, y:{ grid:{display:false} } } }
-  });
-
-  // Cote sanitaire
-  const coteGroups = {};
-  records.forEach(r => { const v=Math.round(Number(getF(r).Cote_sanitaire)||0); if(v>0) coteGroups[v]=(coteGroups[v]||0)+1; });
-  const sCotes = Object.keys(coteGroups).map(Number).sort((a,b)=>a-b);
-  new Chart(document.getElementById('chart-cote'), {
-    type:'bar',
-    data:{ labels:sCotes.map(k=>'/'+k), datasets:[{ data:sCotes.map(k=>coteGroups[k]), backgroundColor:sCotes.map(k=>k>=7?'#2d8653':k>=5?'#f59e0b':'#ef4444'), borderRadius:4 }] },
-    options:{ maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ grid:{display:false} }, y:{ grid:{color:'#f0f0f0'} } } }
-  });
-}
-
-function buildStations(records) {
-  const stC = counter(records, 'Stations');
-  const top8 = Object.entries(stC).filter(([k])=>k).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  if (!top8.length) return;
-  const max = top8[0][1];
-  document.getElementById('stations-bars').innerHTML = top8.map(([label, count], i) => {
-    const pct = Math.round(count/max*100);
-    return `<div class="bar-item">
-      <div class="bar-header"><span class="bar-label">${label}</span><span class="bar-count">${count} arbres</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${COLORS_GREEN[i%COLORS_GREEN.length]}"></div></div>
-    </div>`;
-  }).join('');
-}
-
-// === CHARGEMENT DES DONNÉES ===
-let dataOK = false;
-
-// Mode 1 : widget Grist (onRecords)
-grist.ready({ requiredAccess: 'read table' });
-grist.onRecords(function(records, mappings) {
-  if (dataOK) return;
-  dataOK = true;
-  const normalized = records.map(r => ({
-    id: r.id,
-    fields: (mappings && grist.mapColumnNames) ? grist.mapColumnNames(r) : (r.fields || r)
-  }));
-  buildDashboard(normalized);
+// ---- FEUILLU / RESINEUX ----
+new Chart(document.getElementById('c-ordre'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Feuillu', 'Résineux'],
+    datasets: [{ data: [4676, 318], backgroundColor: ['#2d8653','#6fd49a'], borderWidth: 3, borderColor: 'white' }]
+  },
+  options: { plugins: { legend: { position: 'bottom' } }, cutout: '65%', maintainAspectRatio: false }
 });
 
-// Mode 2 : fallback API directe après 3s
-setTimeout(async () => {
-  if (dataOK) return;
-  document.getElementById('loading-msg').textContent = "Chargement direct depuis l'API Grist…";
-  try {
-    const res = await fetch(
-      `https://docs.getgrist.com/api/docs/${DOC_ID}/tables/${TABLE}/records`,
-      { headers: { 'Authorization': 'Bearer 2732cd1086052472a8e8ae9242bad8014e5946ea' } }
-    );
-    if (!res.ok) throw new Error('API error ' + res.status);
-    const data = await res.json();
-    dataOK = true;
-    buildDashboard(data.records);
-  } catch(e) {
-    document.getElementById('loading').innerHTML = `
-      <div style="color:#ef4444;text-align:center;padding:40px">
-        <div style="font-size:2.5rem">⚠️</div>
-        <p style="font-size:0.9rem;margin-top:12px">Impossible de charger les données.<br>
-        Vérifiez que ce widget est bien connecté à la table <strong>Arbres</strong> dans Grist<br>
-        (Accès : <em>Lire la table</em>).</p>
-      </div>`;
+// ---- VIGUEUR ----
+new Chart(document.getElementById('c-vigueur'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Bonne', 'Moyenne', 'Faible', 'Mort'],
+    datasets: [{ data: [4568, 250, 86, 71], backgroundColor: ['#2d8653','#f59e0b','#f97316','#ef4444'], borderWidth: 3, borderColor: 'white' }]
+  },
+  options: { plugins: { legend: { position: 'bottom' } }, cutout: '65%', maintainAspectRatio: false }
+});
+
+// ---- RISQUE ----
+new Chart(document.getElementById('c-risque'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Faible', 'Moyen', 'Élevé'],
+    datasets: [{ data: [4806, 111, 25], backgroundColor: ['#4aba7a','#f59e0b','#ef4444'], borderWidth: 3, borderColor: 'white' }]
+  },
+  options: { plugins: { legend: { position: 'bottom' } }, cutout: '65%', maintainAspectRatio: false }
+});
+
+// ---- TOP 10 ESPECES ----
+new Chart(document.getElementById('c-especes'), {
+  type: 'bar',
+  data: {
+    labels: ['Platane commun', "Marronnier d'Inde", 'Tilleul commun', 'Tilleul de Crimée', 'Érable plane', 'Chêne pédonculé', 'Charme commun', 'Robinier faux-acacia', 'Érable sycomore', 'Chêne sessile'],
+    datasets: [{ data: [1015, 511, 439, 425, 286, 265, 212, 181, 128, 122], backgroundColor: GREENS, borderRadius: 6 }]
+  },
+  options: {
+    indexAxis: 'y', maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: '#f0f0f0' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
   }
-}, 3000);
+});
+
+// ---- COTE SANITAIRE ----
+new Chart(document.getElementById('c-cote'), {
+  type: 'bar',
+  data: {
+    labels: ['/1','/2','/3','/4','/5','/6','/7','/8'],
+    datasets: [{
+      data: [4, 25, 47, 66, 253, 229, 4246, 19],
+      backgroundColor: ['#ef4444','#ef4444','#ef4444','#f59e0b','#f59e0b','#f59e0b','#2d8653','#2d8653'],
+      borderRadius: 5
+    }]
+  },
+  options: {
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { title: t => 'Cote ' + t[0].label } } },
+    scales: { x: { grid: { display: false } }, y: { grid: { color: '#f0f0f0' } } }
+  }
+});
+
+// ---- STATIONS ----
+const stationsData = [
+  ['Avenue de Belloy', 373],
+  ['Cimetière du Vésinet', 271],
+  ["Pelouse de la prise d'eau", 270],
+  ['Tour extérieur des Ibis', 254],
+  ['Avenue des Pages', 220],
+  ['Boulevard Carnot', 191],
+  ["Avenue de la Princesse", 173],
+  ['Lac Supérieur', 150]
+];
+const maxSt = stationsData[0][1];
+document.getElementById('stations').innerHTML = stationsData.map(([name, count], i) => `
+  <div class="bar-row">
+    <div class="bar-hd"><span class="bar-name">${name}</span><span class="bar-cnt">${count} arbres</span></div>
+    <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(count/maxSt*100)}%;background:${GREENS[i]}"></div></div>
+  </div>`).join('');
 </script>
 </body>
 </html>
